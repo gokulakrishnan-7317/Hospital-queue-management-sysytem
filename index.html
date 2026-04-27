@@ -1,0 +1,1238 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hospital Queue System</title>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --secondary: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+            --text-light: #64748b;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(102, 126, 234, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(118, 75, 162, 0.1) 0px, transparent 50%);
+        }
+
+        .landing-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 60px 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .landing-header {
+            text-align: center;
+            margin-bottom: 4rem;
+            animation: fadeInDown 0.8s ease;
+        }
+
+        .landing-header h1 {
+            color: var(--primary);
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+
+        .landing-header p {
+            color: var(--text-light);
+            font-size: 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #d1fae5;
+            color: #065f46;
+            padding: 0.75rem 1.5rem;
+            border-radius: 50px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            border: 2px solid #a7f3d0;
+        }
+
+        .pulse {
+            width: 10px;
+            height: 10px;
+            background: var(--secondary);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .portal-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        .portal-card {
+            background: var(--card);
+            border-radius: 24px;
+            padding: 3rem;
+            box-shadow: var(--shadow-lg);
+            border: 2px solid transparent;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .portal-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--gradient-primary);
+            transform: scaleX(0);
+            transition: transform 0.4s ease;
+        }
+
+        .portal-card:hover {
+            transform: translateY(-8px);
+            border-color: var(--primary);
+        }
+
+        .portal-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .portal-icon {
+            width: 100px;
+            height: 100px;
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            margin: 0 auto 1.5rem;
+            background: var(--gradient-primary);
+            color: white;
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .patient-portal .portal-icon {
+            background: var(--gradient-success);
+            box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3);
+        }
+
+        .portal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: var(--text);
+        }
+
+        .portal-desc {
+            color: var(--text-light);
+            font-size: 0.95rem;
+        }
+
+        .page { display: none; min-height: 100vh; animation: fadeIn 0.5s ease; }
+        .page.active { display: block; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .page-header {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 1.25rem 0;
+            box-shadow: var(--shadow);
+            margin-bottom: 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .page-title {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .back-btn {
+            background: var(--bg);
+            border: 2px solid var(--border);
+            color: var(--text);
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .back-btn:hover {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+            transform: translateX(-2px);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem 2rem;
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover { transform: translateY(-2px); }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .card-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            background: #dbeafe;
+            color: var(--primary);
+        }
+
+        .card-title { font-size: 1.25rem; font-weight: 700; }
+        .card-subtitle { font-size: 0.875rem; color: var(--text-light); }
+
+        .token-display {
+            background: var(--gradient-primary);
+            color: white;
+            border-radius: 20px;
+            padding: 2.5rem;
+            text-align: center;
+            margin-bottom: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        .token-display::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 60%);
+            animation: rotate 20s linear infinite;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .token-label {
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            margin-bottom: 0.5rem;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+
+        .token-number {
+            font-size: 6rem;
+            font-weight: 800;
+            line-height: 1;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+            position: relative;
+            z-index: 1;
+            font-family: 'Courier New', monospace;
+        }
+
+        .token-status {
+            margin-top: 1rem;
+            padding: 0.5rem 1rem;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50px;
+            display: inline-block;
+            font-size: 0.875rem;
+            font-weight: 600;
+            position: relative;
+            z-index: 1;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 1rem 1.5rem;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 0.75rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary {
+            background: var(--gradient-primary);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+        }
+
+        .btn-success {
+            background: var(--gradient-success);
+            color: white;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.5);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: var(--bg);
+            color: var(--text);
+            border: 2px solid var(--border);
+        }
+
+        .btn-secondary:hover { background: var(--border); }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .stat-box {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            padding: 1.25rem;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid #bae6fd;
+        }
+
+        .stat-value {
+            font-size: 1.75rem;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-light);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .password-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+
+        .password-overlay.show {
+            display: flex;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .password-modal {
+            background: white;
+            padding: 3rem;
+            border-radius: 24px;
+            width: 90%;
+            max-width: 420px;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            transform: scale(0.9);
+            animation: scaleIn 0.3s ease forwards;
+        }
+
+        @keyframes scaleIn {
+            to { transform: scale(1); }
+        }
+
+        .password-input {
+            width: 100%;
+            padding: 1rem;
+            border: 3px solid var(--border);
+            border-radius: 12px;
+            font-size: 1.5rem;
+            text-align: center;
+            letter-spacing: 0.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        .password-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .password-error {
+            color: var(--danger);
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+            min-height: 1.5rem;
+        }
+
+        .input-group { margin-bottom: 1.5rem; }
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            font-size: 1.125rem;
+            transition: all 0.3s;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .queue-info {
+            background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%);
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            border-radius: 0 16px 16px 0;
+            margin-top: 1.5rem;
+            box-shadow: var(--shadow);
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .info-row:last-child { border-bottom: none; }
+
+        .info-label {
+            font-weight: 600;
+            color: var(--text-light);
+        }
+
+        .info-value {
+            font-weight: 700;
+            color: var(--text);
+            font-size: 1.1rem;
+        }
+
+        .smart-calculation {
+            background: var(--gradient-primary);
+            color: white;
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .wait-time-display {
+            font-size: 3rem;
+            font-weight: 800;
+            margin: 0.5rem 0;
+        }
+
+        .calc-details {
+            font-size: 0.8rem;
+            opacity: 0.9;
+            margin-top: 0.5rem;
+            font-style: italic;
+        }
+
+        .progress-container { margin-top: 1.5rem; }
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 12px;
+            background: var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--gradient-success);
+            border-radius: 6px;
+            transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .history-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 1rem;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 0.5rem;
+            background: var(--bg);
+        }
+
+        .history-item {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+        }
+
+        .history-item:hover {
+            background: white;
+            border-radius: 8px;
+        }
+
+        .history-item:last-child { border-bottom: none; }
+
+        .token-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.5rem 1rem;
+            background: var(--primary);
+            color: white;
+            border-radius: 8px;
+            font-weight: 700;
+            font-family: monospace;
+        }
+
+        .time-badge {
+            font-size: 0.875rem;
+            color: var(--text-light);
+            font-weight: 500;
+        }
+
+        .hidden { display: none !important; }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+
+        .alert.show { display: block; }
+        .alert-success { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+        .alert-warning { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 0.75rem 1.25rem;
+            border-radius: 50px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            z-index: 1001;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: var(--shadow);
+            transition: all 0.3s;
+        }
+
+        .connection-online {
+            background: #d1fae5;
+            color: #065f46;
+            border: 2px solid #a7f3d0;
+        }
+
+        .connection-offline {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 2px solid #fecaca;
+        }
+
+        @media (max-width: 768px) {
+            .landing-header h1 { font-size: 2rem; }
+            .token-number { font-size: 4rem; }
+            .card-grid { grid-template-columns: 1fr; }
+            .container { padding: 0 1rem 1rem; }
+        }
+    </style>
+</head>
+<body>
+    <div id="connectionStatus" class="connection-status connection-online">
+        <span class="pulse"></span> Live Sync Active
+    </div>
+
+    <!-- LANDING PAGE -->
+    <div id="landingPage" class="page active">
+        <div class="landing-container">
+            <div class="landing-header">
+                <h1>🏥 Hospital Queue</h1>
+                <p>Intelligent Queue Management System</p>
+                <div class="status-badge">
+                    <span class="pulse"></span>
+                    System Online
+                </div>
+            </div>
+            <div class="portal-grid">
+                <div class="portal-card staff-portal" onclick="app.goToStaff()">
+                    <div class="portal-icon">👨‍⚕️</div>
+                    <div class="portal-title">Staff Portal</div>
+                    <div class="portal-desc">Manage queue with password protection</div>
+                </div>
+                <div class="portal-card patient-portal" onclick="app.goToPatient()">
+                    <div class="portal-icon">🙋</div>
+                    <div class="portal-title">Patient Portal</div>
+                    <div class="portal-desc">Check your queue status</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- STAFF PAGE -->
+    <div id="staffPage" class="page">
+        <div class="page-header">
+            <div class="header-content">
+                <div class="page-title">👨‍⚕️ Staff Control Center</div>
+                <button class="back-btn" onclick="app.goToLanding()">← Back</button>
+            </div>
+        </div>
+        <div class="container">
+            <div id="staffPasswordModal" class="password-overlay">
+                <div class="password-modal">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">🔐</div>
+                    <h2 style="margin-bottom: 0.5rem;">Staff Authentication</h2>
+                    <p style="color: var(--text-light); margin-bottom: 1.5rem;">Enter access code</p>
+                    <input type="password" id="staffPasswordInput" class="password-input" maxlength="4" placeholder="••••"
+                           onkeypress="if(event.key==='Enter')app.verifyPassword()">
+                    <button class="btn btn-primary" onclick="app.verifyPassword()">Unlock System</button>
+                    <div class="password-error" id="passwordError"></div>
+                    <button class="btn btn-secondary" onclick="app.goToLanding()" style="margin-top: 0.5rem;">Cancel</button>
+                </div>
+            </div>
+
+            <div id="staffContent" class="hidden">
+                <div class="card-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">📊</div>
+                            <div>
+                                <div class="card-title">Live Queue Control</div>
+                                <div class="card-subtitle">Real-time Firebase synchronization</div>
+                            </div>
+                        </div>
+                        <div class="token-display">
+                            <div class="token-label">Now Serving</div>
+                            <div class="token-number" id="currentToken">001</div>
+                            <div class="token-status" id="queueStatus">🟢 Active</div>
+                        </div>
+                        <button class="btn btn-success" onclick="app.nextToken()">
+                            <span>➡️</span> Next Patient
+                        </button>
+                        <button class="btn btn-danger" onclick="app.resetQueue()">
+                            <span>🔄</span> Reset Queue
+                        </button>
+                        <div class="stats-grid">
+                            <div class="stat-box">
+                                <div class="stat-value" id="totalServed">0</div>
+                                <div class="stat-label">Served Today</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-value" id="avgTime">0m</div>
+                                <div class="stat-label">Avg. Time</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-value" id="velocity">0</div>
+                                <div class="stat-label">Tokens/Hour</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-value" id="efficiency">98%</div>
+                                <div class="stat-label">Efficiency</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">📜</div>
+                            <div>
+                                <div class="card-title">Service History</div>
+                                <div class="card-subtitle">Last 20 patients</div>
+                            </div>
+                        </div>
+                        <div class="history-list" id="historyList">
+                            <div style="text-align: center; color: var(--text-light); padding: 2rem;">
+                                No patients served yet
+                            </div>
+                        </div>
+                        <button class="btn btn-secondary" onclick="app.staffLogout()" style="margin-top: 1rem;">
+                            🔓 Secure Logout
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PATIENT PAGE -->
+    <div id="patientPage" class="page">
+        <div class="page-header">
+            <div class="header-content">
+                <div class="page-title">🙋 Patient Status Check</div>
+                <button class="back-btn" onclick="app.goToLanding()">← Back</button>
+            </div>
+        </div>
+        <div class="container">
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon" style="background: #d1fae5; color: var(--secondary);">🔍</div>
+                        <div>
+                            <div class="card-title">Check Your Status</div>
+                            <div class="card-subtitle">Smart predictions via analytics</div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-success" id="patientAlert"></div>
+                    
+                    <div class="input-group">
+                        <label>Your Token Number</label>
+                        <input type="number" id="tokenInput" class="input-field" placeholder="Enter token number" min="1"
+                               onkeypress="if(event.key==='Enter')app.checkStatus()">
+                    </div>
+                    
+                    <button class="btn btn-primary" onclick="app.checkStatus()">
+                        <span>🔍</span> Check My Status
+                    </button>
+                    
+                    <div id="patientResult" class="hidden">
+                        <div class="queue-info">
+                            <h3 style="margin-bottom: 1rem; color: var(--primary);">📋 Your Queue Status</h3>
+                            <div class="info-row">
+                                <span class="info-label">Your Token:</span>
+                                <span class="info-value" id="yourToken">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Currently Serving:</span>
+                                <span class="info-value" id="displayCurrent">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">People Ahead:</span>
+                                <span class="info-value" id="peopleAhead" style="color: var(--warning); font-size: 1.25rem;">-</span>
+                            </div>
+                            
+                            <div class="smart-calculation">
+                                <div style="font-size: 0.875rem; opacity: 0.9; margin-bottom: 0.5rem;">⏱️ Estimated Wait Time</div>
+                                <div class="wait-time-display" id="waitTime">--</div>
+                                <div class="calc-details" id="calcDetails"></div>
+                            </div>
+                            
+                            <div class="progress-container">
+                                <div class="progress-label">
+                                    <span>Queue Progress</span>
+                                    <span id="progressPercent">0%</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="progressBar" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon" style="background: #dbeafe; color: var(--primary);">📊</div>
+                        <div>
+                            <div class="card-title">Live Queue Stats</div>
+                            <div class="card-subtitle">Real-time system metrics</div>
+                        </div>
+                    </div>
+                    <div class="stats-grid" style="margin-top: 0;">
+                        <div class="stat-box">
+                            <div class="stat-value" id="liveCurrent">1</div>
+                            <div class="stat-label">Now Serving</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value" id="liveVelocity">0</div>
+                            <div class="stat-label">Speed (per hr)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        
+        const firebaseConfig = {
+            databaseURL: "https://hospital-queue-af9d9-default-rtdb.firebaseio.com/"
+        };
+
+        // Python Server URL
+        const PYTHON_SERVER = 'http://localhost:8000';
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const queueRef = database.ref('hospitalQueue');
+
+        class QueueApp {
+            constructor() {
+                this.PASSWORD = '1234';
+                this.authenticated = false;
+                this.currentData = {
+                    currentToken: 1,
+                    lastToken: 0,
+                    servedCount: 0,
+                    history: [],
+                    startTime: Date.now()
+                };
+                
+                this.setupFirebaseListeners();
+            }
+
+            setupFirebaseListeners() {
+                queueRef.on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        this.currentData = {...this.currentData, ...data};
+                        this.updateAllDisplays();
+                    }
+                });
+            }
+
+            goToLanding() {
+                document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                document.getElementById('landingPage').classList.add('active');
+                this.authenticated = false;
+                document.getElementById('staffContent').classList.add('hidden');
+                document.getElementById('staffPasswordModal').classList.remove('show');
+            }
+
+            goToStaff() {
+                document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                document.getElementById('staffPage').classList.add('active');
+                document.getElementById('staffPasswordModal').classList.add('show');
+                setTimeout(() => document.getElementById('staffPasswordInput').focus(), 100);
+            }
+
+            goToPatient() {
+                document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                document.getElementById('patientPage').classList.add('active');
+                this.updatePatientStats();
+            }
+
+            async verifyPassword() {
+                const input = document.getElementById('staffPasswordInput');
+                const error = document.getElementById('passwordError');
+                
+                try {
+                    const response = await fetch(`${PYTHON_SERVER}/api/auth`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ password: input.value })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        this.authenticated = true;
+                        document.getElementById('staffPasswordModal').classList.remove('show');
+                        document.getElementById('staffContent').classList.remove('hidden');
+                        this.updateStaffDisplay();
+                    } else {
+                        throw new Error('Auth failed');
+                    }
+                } catch (e) {
+                    if (input.value === this.PASSWORD) {
+                        this.authenticated = true;
+                        document.getElementById('staffPasswordModal').classList.remove('show');
+                        document.getElementById('staffContent').classList.remove('hidden');
+                        this.updateStaffDisplay();
+                    } else {
+                        error.textContent = '❌ Invalid access code';
+                        input.value = '';
+                        input.style.borderColor = '#ef4444';
+                        setTimeout(() => {
+                            error.textContent = '';
+                            input.style.borderColor = '';
+                        }, 2000);
+                    }
+                }
+            }
+
+            staffLogout() {
+                this.goToLanding();
+            }
+
+            async nextToken() {
+                if (!this.authenticated) return;
+                
+                const curr = this.currentData.currentToken || 1;
+                const newEntry = {
+                    token: curr,
+                    timestamp: Date.now(),
+                    time: new Date().toLocaleTimeString()
+                };
+                
+                await queueRef.update({
+                    currentToken: curr + 1,
+                    servedCount: (this.currentData.servedCount || 0) + 1,
+                    history: [newEntry, ...(this.currentData.history || [])].slice(0, 20)
+                });
+            }
+
+            async resetQueue() {
+                if (!this.authenticated || !confirm('⚠️ Reset entire queue?')) return;
+                
+                await queueRef.set({
+                    currentToken: 1,
+                    lastToken: 0,
+                    servedCount: 0,
+                    history: [],
+                    startTime: Date.now(),
+                    status: 'reset'
+                });
+            }
+
+            async checkStatus() {
+                const input = document.getElementById('tokenInput');
+                const token = parseInt(input.value);
+                
+                if (!token || token < 1) {
+                    this.showAlert('Please enter a valid token number', 'warning');
+                    return;
+                }
+
+                if (token > this.currentData.lastToken) {
+                    queueRef.update({ lastToken: token });
+                }
+
+                const curr = this.currentData.currentToken || 1;
+                const diff = token - curr;
+                const history = this.currentData.history || [];
+
+                try {
+                    const response = await fetch(`${PYTHON_SERVER}/api/calculate`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            tokens_ahead: Math.max(0, diff),
+                            history: history,
+                            patient_token: token,
+                            current_token: curr
+                        })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.displayPatientStatus({
+                            token: token,
+                            current: curr,
+                            position: Math.max(0, diff),
+                            estimatedWait: data.minutes,
+                            method: data.formula,
+                            progress: data.progress,
+                            status: diff < 0 ? 'served' : diff === 0 ? 'now' : 'waiting'
+                        });
+                    } else {
+                        throw new Error('Calculation failed');
+                    }
+                } catch (e) {
+                    this.calculateClientSide(token, curr, diff, history);
+                }
+            }
+
+            calculateClientSide(token, current, diff, history) {
+                let minutes, formula, status, progress;
+
+                if (diff < 0) {
+                    status = 'served';
+                    minutes = 0;
+                    formula = 'Already served';
+                    progress = 100;
+                } else if (diff === 0) {
+                    status = 'now';
+                    minutes = 0;
+                    formula = 'Your turn now!';
+                    progress = 100;
+                    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                } else {
+                    status = 'waiting';
+                    const velocity = this.calculateVelocity(history);
+                    
+                    if (velocity > 0) {
+                        const minPerToken = 60 / velocity;
+                        minutes = Math.round(diff * minPerToken * 10) / 10;
+                        formula = `${diff} × ${Math.round(minPerToken * 10) / 10} min @ ${velocity}/hr`;
+                    } else {
+                        minutes = diff * 5;
+                        formula = `${diff} × 5 min (estimate)`;
+                    }
+                    
+                    progress = Math.max(0, (current / token) * 100);
+                }
+
+                this.displayPatientStatus({
+                    token: token,
+                    current: current,
+                    position: Math.max(0, diff),
+                    estimatedWait: minutes,
+                    method: formula,
+                    progress: progress,
+                    status: status
+                });
+            }
+
+            calculateVelocity(history) {
+                if (!history || history.length < 2) return 0;
+                const recent = history.slice(0, 5);
+                const times = recent.map(h => h.timestamp).filter(t => t);
+                if (times.length < 2) return 0;
+                const hours = (Math.max(...times) - Math.min(...times)) / 1000 / 3600;
+                return hours > 0 ? Math.round((times.length / hours) * 10) / 10 : 0;
+            }
+
+            displayPatientStatus(data) {
+                document.getElementById('yourToken').textContent = data.token.toString().padStart(3, '0');
+                document.getElementById('displayCurrent').textContent = data.current.toString().padStart(3, '0');
+                document.getElementById('peopleAhead').textContent = data.position;
+
+                const waitEl = document.getElementById('waitTime');
+                const detailsEl = document.getElementById('calcDetails');
+
+                if (data.status === 'served') {
+                    waitEl.textContent = 'Done ✅';
+                    waitEl.style.color = '#10b981';
+                    detailsEl.textContent = 'This token has already been served';
+                } else if (data.status === 'now') {
+                    waitEl.textContent = 'Now! 🎉';
+                    waitEl.style.color = '#fbbf24';
+                    detailsEl.textContent = 'Please proceed to the counter';
+                    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                } else {
+                    waitEl.textContent = `~${data.estimatedWait} min`;
+                    waitEl.style.color = 'white';
+                    detailsEl.textContent = data.method;
+                }
+
+                document.getElementById('progressBar').style.width = data.progress + '%';
+                document.getElementById('progressPercent').textContent = Math.round(data.progress) + '%';
+                
+                document.getElementById('patientResult').classList.remove('hidden');
+                document.getElementById('tokenInput').value = '';
+            }
+
+            updateAllDisplays() {
+                if (document.getElementById('staffPage').classList.contains('active') && this.authenticated) {
+                    this.updateStaffDisplay();
+                }
+                if (document.getElementById('patientPage').classList.contains('active')) {
+                    this.updatePatientStats();
+                }
+            }
+
+            updateStaffDisplay() {
+                const data = this.currentData;
+                const curr = data.currentToken || 1;
+                
+                document.getElementById('currentToken').textContent = curr.toString().padStart(3, '0');
+                document.getElementById('totalServed').textContent = data.servedCount || 0;
+                
+                const start = data.startTime || Date.now();
+                const elapsed = (Date.now() - start) / 1000 / 60;
+                const served = data.servedCount || 0;
+                const avg = served > 0 ? Math.round(elapsed / served) : 0;
+                document.getElementById('avgTime').textContent = avg + 'm';
+
+                const velocity = this.calculateVelocity(data.history);
+                document.getElementById('velocity').textContent = velocity;
+
+                const historyList = document.getElementById('historyList');
+                const history = data.history || [];
+                
+                if (history.length === 0) {
+                    historyList.innerHTML = '<div style="text-align: center; color: var(--text-light); padding: 2rem;">No patients served yet</div>';
+                } else {
+                    historyList.innerHTML = history.slice(0, 20).map(h => `
+                        <div class="history-item">
+                            <span class="token-badge">#${h.token.toString().padStart(3, '0')}</span>
+                            <span class="time-badge">${h.time || new Date(h.timestamp).toLocaleTimeString()}</span>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            updatePatientStats() {
+                document.getElementById('liveCurrent').textContent = 
+                    (this.currentData.currentToken || 1).toString().padStart(3, '0');
+                document.getElementById('liveVelocity').textContent = 
+                    this.calculateVelocity(this.currentData.history);
+            }
+
+            showAlert(message, type) {
+                const alert = document.getElementById('patientAlert');
+                alert.textContent = message;
+                alert.className = `alert alert-${type} show`;
+                setTimeout(() => alert.classList.remove('show'), 3000);
+            }
+        }
+
+        const app = new QueueApp();
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (document.getElementById('staffPasswordModal').classList.contains('show')) {
+                    app.goToLanding();
+                }
+            }
+        });
+    </script>
+</body>
+</html>'''
+
